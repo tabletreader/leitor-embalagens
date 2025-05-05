@@ -61,10 +61,10 @@ if uploaded_file:
     buffer = io.BytesIO()
     with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
         df.to_excel(writer, index=False, sheet_name='Medicamento')
-        writer.save()
-        st.download_button(
-            label="Baixar planilha Excel",
-            data=buffer.getvalue(),
-            file_name="medicamento_extraido.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+
+    st.download_button(
+        label="Baixar planilha Excel",
+        data=buffer.getvalue(),
+        file_name="medicamento_extraido.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
