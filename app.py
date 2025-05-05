@@ -5,17 +5,12 @@ import pandas as pd
 import io
 import requests
 import base64
+import re
 import unicodedata
 
-st.title("Leitor de Embalagens de Medicamentos (OCR + Reconhecimento por Palavras-Chave)")
+st.title("Leitor de Embalagens de Medicamentos (Extração Estruturada)")
 
-API_KEY = "helloworld"  # chave gratuita da OCR.Space
-
-# Lista de palavras-chave de medicamentos comuns
-palavras_chave = [
-    "loratadina", "dipirona", "ibuprofeno", "paracetamol", "doril", "buprovil", "transamin", 
-    "ácido tranexâmico", "amoxicilina", "neo loratadin", "neosoro", "losartana", "omeprazol"
-]
+API_KEY = "helloworld"  # OCR.Space API key gratuita
 
 def normalizar(texto):
     texto = texto.lower()
@@ -39,6 +34,11 @@ def ocr_space_api(image_file):
         return "Erro na API OCR: " + result.get("ErrorMessage", ["Desconhecido"])[0]
     return result["ParsedResults"][0]["ParsedText"]
 
+# Palavras comuns (listas parciais e ampliáveis)
+principios_ativos = ["loratadina", "dipirona", "ibuprofeno", "paracetamol", "amoxicilina", "ácido tranexâmico"]
+nomes_comerciais = ["neo loratadin", "doril", "buprovil", "transamin", "neosoro"]
+fabricantes = ["neo quimica", "zydus", "ems", "medley", "eurofarma", "ache", "teva", "germed", "legrand"]
+
 uploaded_file = st.file_uploader("Envie uma imagem da embalagem", type=["jpg", "jpeg", "png"])
 
 if uploaded_file:
@@ -49,25 +49,39 @@ if uploaded_file:
         texto_ocr = ocr_space_api(image)
 
     texto_normalizado = normalizar(texto_ocr)
-    st.subheader("Texto OCR (normalizado):")
+    st.subheader("Texto extraído (normalizado):")
     st.text(texto_normalizado)
 
-    encontrados = [palavra for palavra in palavras_chave if palavra in texto_normalizado]
+    # Extrações simples com base em padrões e listas
+    principio = next((p for p in principios_ativos if p in texto_normalizado), "Não identificado")
+    nome_comercial = next((n for n in nomes_comerciais if n in texto_normalizado), "Não identificado")
+    fabricante = next((f for f in fabricantes if f in texto_normalizado), "Não identificado")
 
-    if encontrados:
-        st.subheader("Medicamentos identificados:")
-        df = pd.DataFrame({"Medicamento identificado": encontrados})
-        st.dataframe(df)
+    dosagem_match = re.search(r'(\d+\s?(mg|g|mg/ml|mcg))', texto_normalizado)
+    quantidade_match = re.search(r'(\d+\s?(comprimidos|capsulas|ampolas))', texto_normalizado)
 
-        buffer = io.BytesIO()
-        with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
-            df.to_excel(writer, index=False, sheet_name="Medicamentos")
+    dosagem = dosagem_match.group(0) if dosagem_match else "Não identificada"
+    quantidade = quantidade_match.group(0) if quantidade_match else "Não identificada"
 
-        st.download_button(
-            label="Baixar planilha Excel",
-            data=buffer.getvalue(),
-            file_name="medicamentos_identificados.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-    else:
-        st.warning("Nenhum medicamento conhecido foi identificado no texto extraído.")
+    dados = {
+        "Princípio ativo": [principio],
+        "Nome comercial": [nome_comercial],
+        "Fabricante": [fabricante],
+        "Dosagem": [dosagem],
+        "Quantidade": [quantidade]
+    }
+
+    df = pd.DataFrame(dados)
+    st.subheader("Informações estruturadas extraídas:")
+    st.dataframe(df)
+
+    buffer = io.BytesIO()
+    with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
+        df.to_excel(writer, index=False, sheet_name="Medicamento")
+
+    st.download_button(
+        label="Baixar planilha Excel",
+        data=buffer.getvalue(),
+        file_name="medicamento_estruturado.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
