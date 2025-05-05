@@ -1,6 +1,5 @@
-
 streamlit
-pytesseract
-pillow
+Pillow
 pandas
+requests
 xlsxwriter
